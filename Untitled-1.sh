@@ -3,6 +3,8 @@
 # bash script to create playlist files in music subdirectories
 #
 # Steve Carlson (stevengcarlson@gmail.com)
+
+# updated by Riley
 PWD=$(pwd)
 find . -type d |
 while read subdir
