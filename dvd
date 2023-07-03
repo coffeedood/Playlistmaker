@@ -1,0 +1,47 @@
+import os
+
+def create_album_playlists(path, playlist_dir, output_file):
+    playlist_paths = []
+
+    with open(output_file, 'w') as txt_file:
+        for root, dirs, files in os.walk(path):
+            if "VIDEO_TS" in dirs:
+                parent_folder_name = os.path.basename(root)
+                playlist_name = f'{parent_folder_name}.m3u'
+                playlist_path = os.path.join(playlist_dir, playlist_name)
+                playlist_path = get_unique_playlist_name(playlist_path, playlist_paths)
+                playlist_paths.append(playlist_path)
+                with open(playlist_path, 'w') as playlist_file:
+                    playlist_name = os.path.join(root, "VIDEO_TS")
+                    playlist_file.write('file://' + playlist_name)
+                sanitized_title = sanitize_title(parent_folder_name)
+                txt_file.write(sanitized_title + '\n')
+
+    print(f'Album playlists created in {playlist_dir}.')
+    print(f'Titles written to {output_file}.')
+
+def get_unique_playlist_name(playlist_path, existing_playlists):
+    base_name, ext = os.path.splitext(playlist_path)
+    index = 1
+    unique_name = playlist_path
+    while unique_name in existing_playlists:
+        unique_name = f'{base_name}_{index}{ext}'
+        index += 1
+    return unique_name
+
+def sanitize_title(title):
+    sanitized_title = title.replace('.dvdmedia', '')  # Remove ".dvdmedia" from the title
+    return sanitized_title
+
+
+# Set the path to the directory to scan for VIDEO_TS folders
+path = '/media/riley/Elements/NEWEST'
+
+# Set the path to the directory where the playlists will be created
+playlist_dir = '/media/riley/Elements/hjjj44'
+
+# Set the output file path to save the titles
+output_file = '/media/riley/Elements/titles997.txt'
+
+# Call the function to create album playlists and write titles to the output file
+create_album_playlists(path, playlist_dir, output_file)
