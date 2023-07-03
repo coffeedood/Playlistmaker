@@ -1,0 +1,15 @@
+import os
+import sys
+
+def run_command(command):
+    os.system(command)
+
+if __name__ == "__main__":
+    if len(sys.argv) != 2:
+        print("Usage: python script.py [song_title]")
+        sys.exit(1)
+
+    song_title = sys.argv[1]
+    command = "open '" + song_title + ".m3u'"  # Replace with your desired command
+
+    run_command(command)
