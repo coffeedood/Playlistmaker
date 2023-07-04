@@ -1,0 +1,110 @@
+import os
+import re
+
+def sanitize_playlist_name(name):
+    return re.sub(r'[^a-zA-Z0-9 ]', '', name)
+
+def get_track_number(filename):
+    track_number = re.search(r'^\d+', filename)
+    if track_number:
+        return int(track_number.group())
+    return float('inf')
+
+def create_song_playlists(path, playlist_dir):
+    existing_paths = []
+    for root, dirs, files in os.walk(path):
+        for file in files:
+            if file.lower().endswith('.aif'):
+                if file.startswith("._"):
+                    continue
+            song_path = os.path.join(root, file)
+            relative_path = os.path.relpath(song_path, '/media/riley/Expansion').replace("", "")
+            song_name = os.path.splitext(file)[0]
+            sanitized_song_name = re.sub(r'^\d+[-\s]?\d*\s*', '', song_name)
+            playlist_name = f"{sanitize_playlist_name(sanitized_song_name).lower()}.m3u"
+            playlist_path = os.path.join(playlist_dir, playlist_name)
+            playlist_path = get_unique_playlist_name(playlist_path, existing_paths)
+            existing_paths.append(playlist_path)
+
+            album_path = os.path.dirname(song_path)
+            album_files = sorted(
+                [f for f in os.listdir(album_path) if
+                 (f.lower().endswith('.aif') or f.lower().endswith('.aiff')) and not f.startswith("._")],
+                key=lambda x: (int(re.search(r'\d+', x).group()) if re.search(r'\d+', x) else float('inf'), x)
+            )
+            album_songs = []
+
+            add_to_album = False
+            for index, album_file in enumerate(album_files):
+                album_song_path = os.path.join(album_path, album_file)
+
+                if add_to_album:
+                    album_songs.append(album_song_path)
+
+                if album_song_path == song_path:
+                    add_to_album = True
+
+            with open(playlist_path, 'w') as playlist_file:
+                playlist_file.write(f'file:///media/riley/Expansion/{relative_path}\n')  # Add current song at the top of the playlist
+
+                for song_path in album_songs:
+                    relative_path = os.path.relpath(song_path, '/media/riley/Expansion').replace("", "")
+                    playlist_file.write(f'file:///media/riley/Expansion/{relative_path}\n')
+
+def create_artist_playlists(path, playlist_dir):
+    artists = {}
+    playlist_paths = []
+
+    for root, dirs, files in os.walk(path):
+        for file in files:
+            if file.lower().endswith('.aif') or file.lower().endswith('.aiff'):
+                artist_name = os.path.basename(os.path.dirname(root))
+                album_name = os.path.basename(root)
+                if artist_name not in artists:
+                    artists[artist_name] = {}
+                if album_name not in artists[artist_name]:
+                    artists[artist_name][album_name] = []
+                artists[artist_name][album_name].append(os.path.join(root, file))
+
+    for artist_name, albums in artists.items():
+        artist_playlist_path = os.path.join(playlist_dir, f'{artist_name.lower()}.m3u')
+        artist_playlist_path = get_unique_playlist_name(artist_playlist_path, playlist_paths)
+        playlist_paths.append(artist_playlist_path)
+        with open(artist_playlist_path, 'w') as artist_playlist_file:
+            for album_name, song_paths in sorted(albums.items(), key=lambda x: get_track_number(x[0])):
+                album_playlist_path = os.path.join(playlist_dir, f'{album_name}.m3u'.lower())
+                album_playlist_path = get_unique_playlist_name(album_playlist_path, playlist_paths)
+                playlist_paths.append(album_playlist_path)
+                with open(album_playlist_path, 'w') as album_playlist_file:
+                    sorted_song_paths = sorted(song_paths, key=lambda x: (get_track_number(os.path.basename(x)), x))
+                    for song_path in sorted_song_paths:
+                        relative_path = os.path.relpath(song_path, '/media/riley/Expansion').replace("", "")
+                        album_playlist_file.write(f'file:///media/riley/Expansion/{relative_path}\n')
+
+                        # Write the song path to the artist playlist as well
+                        artist_playlist_file.write(f'file:///media/riley/Expansion/{relative_path}\n')
+
+
+def get_unique_playlist_name(playlist_path, existing_paths):
+    base_dir = os.path.dirname(playlist_path)
+    base_name = os.path.splitext(os.path.basename(playlist_path))[0]
+    counter = 1
+    new_path = playlist_path
+    while new_path in existing_paths:
+        new_name = f'{base_name} {counter}'
+        new_path = os.path.join(base_dir, f'{new_name.lower()}.m3u')
+        counter += 1
+    return new_path
+
+
+# Set the path to the main folder and the playlist directory
+path = '/media/riley/Expansion/Media/Music'
+playlist_dir = '/home/riley'
+
+# Create the playlist directory if it doesn't exist
+if not os.path.exists(playlist_dir):
+    os.makedirs(playlist_dir)
+
+create_song_playlists(path, playlist_dir)
+create_artist_playlists(path, playlist_dir)
+
