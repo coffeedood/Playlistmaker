@@ -1,0 +1,74 @@
+import os
+import re
+import urllib.parse
+from collections import defaultdict
+
+def sanitize_playlist_name(name):
+    return re.sub(r'[^a-zA-Z0-9 ]', '', name).replace("'", '')
+
+
+def create_playlists(path, playlist_dir):
+    artists = defaultdict(list)
+    albums = defaultdict(list)
+    songs = defaultdict(list)
+    counter = defaultdict(lambda: 1)  # Universal counter for all playlists starting at 1
+
+    for root, dirs, files in os.walk(path):
+        for file in files:
+            if file.lower().endswith(('.aif', '.aiff')):
+                artist_name = os.path.basename(os.path.dirname(root))
+                album_name = os.path.basename(root)
+                title = os.path.splitext(file)[0]
+
+                artists[artist_name].append(os.path.join(root, file))
+                albums[artist_name, album_name].append(os.path.join(root, file))
+                songs[artist_name, album_name, title].append(os.path.join(root, file))
+
+    # Create artist playlists
+    for artist_name, artist_paths in artists.items():
+        artist_playlist_path = os.path.join(
+            playlist_dir, f'{sanitize_playlist_name(artist_name)}.m3u'
+        )
+        with open(artist_playlist_path, 'w') as artist_playlist_file:
+            artist_playlist_file.write(f'# Artist: {artist_name} ({len(artist_paths)})\n')
+
+            for artist_path in artist_paths:
+                encoded_path = urllib.parse.quote(artist_path)
+                artist_playlist_file.write(f'file:///{encoded_path}\n')
+
+    # Create album playlists
+    for (artist_name, album_name), album_paths in albums.items():
+        album_playlist_path = os.path.join(
+            playlist_dir, f'{sanitize_playlist_name(album_name)} {counter[album_name]}.m3u'
+        )
+        with open(album_playlist_path, 'w') as album_playlist_file:
+            album_playlist_file.write(f'# Album: {album_name} ({len(album_paths)})\n')
+
+            for album_path in album_paths:
+                encoded_path = urllib.parse.quote(album_path)
+                album_playlist_file.write(f'file:///{encoded_path}\n')
+
+        counter[album_name] += 1
+
+    # Create song playlists
+    for (artist_name, album_name, title), song_paths in songs.items():
+        song_playlist_path = os.path.join(
+            playlist_dir, f'{sanitize_playlist_name(title)} {counter[title]}.m3u'
+        )
+        with open(song_playlist_path, 'w') as song_playlist_file:
+            song_playlist_file.write(f'# Song: {title} ({len(song_paths)})\n')
+
+            for song_path in song_paths:
+                encoded_path = urllib.parse.quote(song_path)
+                song_playlist_file.write(f'file:///{encoded_path}\n')
+
+        counter[title] += 1
+
+path = '/home/riley/Desktop/xxx999'
+playlist_dir = '/home/riley'
+
+# Create the playlist directory if it doesn't exist
+if not os.path.exists(playlist_dir):
+    os.makedirs(playlist_dir)
+
+create_playlists(path, playlist_dir)
