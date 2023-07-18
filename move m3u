@@ -1,0 +1,25 @@
+import os
+import shutil
+
+def move_m3u_files(source_dir, destination_dir):
+    # Create the destination directory if it doesn't exist
+    os.makedirs(destination_dir, exist_ok=True)
+
+    # Get the list of files in the source directory
+    files = os.listdir(source_dir)
+
+    for file in files:
+        if file.endswith('.m3u'):
+            # Build the absolute paths for the source and destination files
+            source_file = os.path.join(source_dir, file)
+            destination_file = os.path.join(destination_dir, file)
+
+            # Move the file
+            shutil.move(source_file, destination_file)
+            print(f"Moved {file} to {destination_dir}")
+
+# Example usage
+source_directory = '/home/riley/999qqq'
+destination_directory = 'home/riley'
+
+move_m3u_files(source_directory, destination_directory)
