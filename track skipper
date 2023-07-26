@@ -1,0 +1,24 @@
+import os
+import dbus
+import time
+
+def skip_tracks(num_tracks):
+    bus = dbus.SessionBus()
+    player_obj = bus.get_object('org.mpris.MediaPlayer2.vlc', '/org/mpris/MediaPlayer2')
+    player_interface = dbus.Interface(player_obj, 'org.mpris.MediaPlayer2.Player')
+
+    if num_tracks > 0:
+        for _ in range(num_tracks):
+            player_interface.Previous()
+            time.sleep(0.1)
+    else:
+        for _ in range(-num_tracks):
+            player_interface.Next()
+            time.sleep(0.1)
+
+if __name__ == "__main__":
+    try:
+        num_tracks = int(input("Enter the number of tracks to skip (negative number to go back): "))
+        skip_tracks(num_tracks)
+    except ValueError:
+        print("Invalid input. Please enter a valid number.")
