@@ -1,0 +1,123 @@
+import os
+import re
+import tkinter as tk
+from tkinter import filedialog
+import urllib.parse
+from collections import defaultdict
+
+MAX_FILENAME_LENGTH = 245
+
+def sanitize_playlist_name(name):
+    return re.sub(r'(\d+\s)?', '', re.sub(r'[^a-zA-Z0-9 ]', '', name).replace("'", '')).lower()
+
+def natural_sort_key(s):
+    return [int(c) if c.isdigit() else c for c in re.split(r'(\d+)', s)]
+
+def get_track_number(filename):
+    track_number = re.search(r'^\d+', filename)
+    if track_number:
+        return int(track_number.group())
+    return float('inf')
+
+def extract_track_number(filename):
+    track_number = re.search(r'^\d+', filename)
+    if track_number:
+        return int(track_number.group())
+    return float('inf')
+
+def create_artist_playlists(path, playlist_dir):
+    artists = {}
+    playlist_paths = []
+
+    for root, dirs, files in os.walk(path):
+        for file in files:
+            if file.lower().endswith('.aif') or file.lower().endswith('.aiff'):
+                artist_name = os.path.basename(os.path.dirname(root))
+                album_name = os.path.basename(root)
+                if artist_name not in artists:
+                    artists[artist_name] = {}
+                if album_name not in artists[artist_name]:
+                    artists[artist_name][album_name] = []
+                artists[artist_name][album_name].append(os.path.join(root, file))
+
+    for artist_name, albums in artists.items():
+        artist_playlist_path = os.path.join(playlist_dir, f'{sanitize_playlist_name(artist_name.lower())}.m3u')
+        artist_playlist_path = get_unique_playlist_name(artist_playlist_path, playlist_paths)
+        playlist_paths.append(artist_playlist_path)
+        with open(artist_playlist_path, 'w') as artist_playlist_file:
+            for album_name, song_paths in sorted(albums.items(), key=lambda x: extract_track_number(x[0])):
+                album_playlist_path = os.path.join(
+            playlist_dir, f'{sanitize_playlist_name(album_name)}{sanitize_playlist_name(artist_name)}.m3u'
+        )
+                album_playlist_path = get_unique_playlist_name(album_playlist_path, playlist_paths)
+                playlist_paths.append(album_playlist_path)
+                with open(album_playlist_path, 'w') as album_playlist_file:
+                    sorted_song_paths = sorted(song_paths, key=lambda x: (extract_track_number(os.path.basename(x)), x))
+                    for song_path in sorted_song_paths:
+                        relative_path = os.path.relpath(song_path, path)
+                        encoded_path = urllib.parse.quote(relative_path)
+                        # Write the song path to the artist playlist as well
+                        artist_playlist_file.write(f'file:///media/riley/Expansion/Media/Music/{encoded_path}\n')
+
+                        album_playlist_file.write(f'file:///media/riley/Expansion/Media/Music/{encoded_path}\n')
+
+
+def create_song_playlists(path, playlist_dir, existing_paths):
+    for root, dirs, files in os.walk(path):
+        for file in files:
+            if file.lower().endswith(('.aif', '.aiff')):
+                artist_name = os.path.basename(os.path.dirname(root))
+                album_name = os.path.basename(root)
+                title = os.path.splitext(file)[0]
+
+                playlist_title = f'{title}_{album_name}_{artist_name}'
+                playlist_name = sanitize_playlist_name(playlist_title)
+                playlist_name = playlist_name[:MAX_FILENAME_LENGTH - len('.m3u')]
+
+                song_playlist_path = os.path.join(playlist_dir, f'{playlist_name}.m3u')
+                song_playlist_path = get_unique_playlist_name(song_playlist_path, existing_paths)
+                existing_paths.append(song_playlist_path)
+
+                with open(song_playlist_path, 'w', encoding='utf-8') as song_playlist_file:
+                    song_playlist_file.write(f'# Song: {title}\n')
+                    song_playlist_file.write(f'# Album: {album_name}\n')
+                    song_playlist_file.write(f'# Artist: {artist_name}\n')
+                    encoded_path = urllib.parse.quote(os.path.abspath(os.path.join(root, file)))
+                    song_playlist_file.write(f'file://{encoded_path}\n')
+
+def get_unique_playlist_name(playlist_path, existing_paths):
+    base_dir = os.path.dirname(playlist_path)
+    base_name = os.path.splitext(os.path.basename(playlist_path))[0]
+    counter = 1
+    new_path = playlist_path
+    while new_path in existing_paths:
+        new_name = f'{base_name} {counter}'
+        new_name = re.sub(r'[^a-zA-Z0-9_]', ' ', new_name).replace("'", '')
+        new_path = os.path.join(base_dir, f'{new_name.lower()}.m3u')
+        counter += 1
+    return new_path
+
+def create_all_playlists():
+    root = tk.Tk()
+    root.withdraw()
+
+    music_folder = filedialog.askdirectory(
+        title="Select Music Folder",
+        mustexist=True,
+        parent=root,
+    )
+    playlist_dir = filedialog.askdirectory(
+        title="Select Playlist Folder",
+        mustexist=True,
+        parent=root,
+    )
+
+    if not os.path.exists(playlist_dir):
+        os.makedirs(playlist_dir)
+
+    existing_paths = []
+    create_artist_playlists(music_folder, playlist_dir)
+    create_song_playlists(music_folder, playlist_dir, existing_paths)
+
+# Call the function to create all the playlists
+create_all_playlists()
