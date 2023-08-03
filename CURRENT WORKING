@@ -28,10 +28,6 @@ def save_bash_history_to_m3u():
     with open(history_m3u_path, "w") as history_m3u_file:
         history_m3u_file.writelines(history_lines)
 
-
-
-
-
 #cat /dev/null > ~/.bash_history
 #history -c
 #truncate -s 0 history.m3u
@@ -171,6 +167,26 @@ def select_random_song_from_history(playlist_path):
     # Read the entire history from the history file
     with open(history_file_path, "r") as history_file:
         playlist_lines = history_file.readlines()
+
+    # Remove any lines that start with '#'
+    playlist_lines = [line for line in playlist_lines if not line.startswith("#")]
+
+    # Select a random song from the playlist
+    if playlist_lines:
+        random_song = random.choice(playlist_lines).strip()
+        return random_song
+    else:
+        print("The playlist is empty.")
+        return None
+    
+def load_history_to_m3u(history_file_path):
+    # Run the bash command "history >> history.m3u"
+    command = f"history >> {history_file_path}"
+    subprocess.run(command, shell=True)
+
+def select_random_song_from_history2(playlist_path):
+    with open(playlist_path, "r") as playlist_file:
+        playlist_lines = playlist_file.readlines()
 
     # Remove any lines that start with '#'
     playlist_lines = [line for line in playlist_lines if not line.startswith("#")]
@@ -406,7 +422,7 @@ if __name__ == "__main__":
             save_command_history_to_playlist(playlist_name)
         elif choice == "12":
             input_file = "history.m3u"
-            output_file = input("Enter history999: ")
+            output_file = input("Enter history3333: ")
 
             select_open_commands(input_file, output_file)
 
@@ -415,8 +431,8 @@ if __name__ == "__main__":
                 if num_songs == "0":
                     break
                 try:
-                    history_playlist_path = os.path.join(os.path.expanduser("~"), "history999.m3u")
-                    random_song = select_random_song_from_history(history_playlist_path)
+                    history_playlist_path = os.path.join(os.path.expanduser("~"), "history3333.m3u")
+                    random_song = select_random_song_from_history2(history_playlist_path)
                     if random_song:
                         print(f"Random song selected: {random_song}")
                         # Run the bash command "open '{random_song}.m3u'"
