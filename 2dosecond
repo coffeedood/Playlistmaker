@@ -1,0 +1,81 @@
+import os
+import re
+import urllib.parse
+from collections import defaultdict
+
+MAX_FILENAME_LENGTH = 245
+
+def sanitize_playlist_name(name):
+    return re.sub(r'(\d+\s)?', '', re.sub(r'[^a-zA-Z0-9 ]', '', name).replace("'", '')).lower()
+
+def natural_sort_key(s):
+    # Custom function to extract the numeric portion of a string for natural sorting
+    return [int(c) if c.isdigit() else c for c in re.split(r'(\d+)', s)]
+
+def get_track_number(filename):
+    track_number = re.search(r'^\d+', filename)
+    if track_number:
+        return int(track_number.group())
+    return float('inf')
+
+def create_song_playlists(path, playlist_dir, existing_paths):
+    albums = defaultdict(list)
+
+    for root, dirs, files in os.walk(path):
+        for file in files:
+            if file.lower().endswith(('.aif', '.aiff')) and not file.startswith('._'):
+                artist_name = os.path.basename(os.path.dirname(root))
+                album_name = os.path.basename(root)
+                title = os.path.splitext(file)[0]
+
+                albums[artist_name, album_name].append((title, os.path.join(root, file)))
+
+    for (artist_name, album_name), album_songs in albums.items():
+        album_songs.sort(key=lambda x: natural_sort_key(x[0]))
+
+        for idx, (title, song_path) in enumerate(album_songs):
+            playlist_title = f'{title}'
+            playlist_name = sanitize_playlist_name(playlist_title)
+            playlist_name = playlist_name[:MAX_FILENAME_LENGTH - len('.m3u')]
+
+            song_playlist_path = os.path.join(playlist_dir, f'{playlist_name}append.m3u').lower()
+            song_playlist_path = get_unique_playlist_name(song_playlist_path, existing_paths)
+            existing_paths.append(song_playlist_path)
+
+            with open(song_playlist_path, 'w') as song_playlist_file:
+                song_playlist_file.write(f'# Song: {title}\n')
+                song_playlist_file.write(f'# Album: {album_name}\n')
+                song_playlist_file.write(f'# Artist: {artist_name}\n')
+
+                for next_title, next_song_path in album_songs[idx:]:
+                    encoded_path = urllib.parse.quote(next_song_path)
+                    song_playlist_file.write(f'file://{encoded_path}\n')
+
+def get_unique_playlist_name(playlist_path, existing_paths):
+    base_dir = os.path.dirname(playlist_path)
+    base_name = os.path.splitext(os.path.basename(playlist_path))[0]
+    counter = 1
+    new_path = playlist_path
+    while new_path in existing_paths:
+        new_name = f'{base_name}{counter}'
+        new_name = re.sub(r'[^a-zA-Z0-9_]', ' ', new_name).replace("'", '')
+        new_path = os.path.join(base_dir, f'{new_name.lower()}.m3u')
+        counter += 1
+    return new_path
+
+def create_all_playlists(path, playlist_dir):
+    # Create the playlist directory if it doesn't exist
+    if not os.path.exists(playlist_dir):
+        os.makedirs(playlist_dir)
+
+    existing_paths = []
+    #create_artist_playlists(path, playlist_dir, existing_paths)
+    #create_album_playlists(path, playlist_dir, existing_paths)
+    create_song_playlists(path, playlist_dir, existing_paths)
+
+# Example usage:
+path = '/media/riley/Elements/Media/Music'
+playlist_dir = '/home/riley'
+
+# Call the function to create all the playlists
+create_all_playlists(path, playlist_dir)
