@@ -1,0 +1,94 @@
+import os
+import re
+import urllib.parse
+from collections import defaultdict
+import tkinter as tk
+from tkinter import filedialog
+
+MAX_FILENAME_LENGTH = 245
+
+def sanitize_playlist_name(name):
+    return re.sub(r'(\d+\s)?', '', re.sub(r'[^a-zA-Z0-9 ]', '', name).replace("'", '')).lower()
+
+def natural_sort_key(s):
+    return [int(c) if c.isdigit() else c for c in re.split(r'(\d+)', s)]
+
+def get_track_number(filename):
+    track_number = re.search(r'^\d+', filename)
+    if track_number:
+        return int(track_number.group())
+    return float('inf')
+
+def extract_track_number(filename):
+    track_number = re.search(r'^\d+', filename)
+    if track_number:
+        return int(track_number.group())
+    return float('inf')
+
+
+
+def create_song_playlists(path, playlist_dir, existing_paths):
+    songs = defaultdict(list)
+
+    for root, dirs, files in os.walk(path):
+        for file in files:
+            if file.lower().endswith(('.aif', '.aiff')) and not file.startswith('._'):
+                artist_name = os.path.basename(os.path.dirname(os.path.dirname(root)))
+                album_name = os.path.basename(os.path.dirname(root))
+                title = os.path.splitext(file)[0]
+
+                songs[title].append((artist_name, album_name, os.path.join(root, file)))
+
+    for title, song_versions in songs.items():
+        song_versions.sort(key=lambda x: natural_sort_key(x[1]))
+
+        for idx, (artist_name, album_name, song_path) in enumerate(song_versions):
+            playlist_title = f'{title}'
+            playlist_name = sanitize_playlist_name(playlist_title)
+            playlist_name = playlist_name[:MAX_FILENAME_LENGTH - len('.m3u')]
+
+            # Check if the playlist_name already exists in the existing_paths list
+            # If yes, append a counter to the playlist_name
+            counter = 1
+            new_playlist_name = playlist_name
+            while new_playlist_name in existing_paths:
+                new_playlist_name = f'{playlist_name}{counter}'
+                counter += 1
+
+            # Add the new_playlist_name to the existing_paths list
+            existing_paths.append(new_playlist_name)
+
+            song_playlist_path = os.path.join(playlist_dir, f'{new_playlist_name}.m3u')
+            with open(song_playlist_path, 'w', encoding='utf-8') as song_playlist_file:
+                song_playlist_file.write(f'# Song: {title}\n')
+                song_playlist_file.write(f'# Album: {album_name}\n')
+                song_playlist_file.write(f'# Artist: {artist_name}\n')
+                encoded_path = urllib.parse.quote(os.path.abspath(song_path))
+                song_playlist_file.write(f'file://{encoded_path}\n')
+
+
+def create_all_playlists():
+    root = tk.Tk()
+    root.withdraw()
+
+    source_folder = filedialog.askdirectory(
+        title="Select Source Music Folder",
+        mustexist=True,
+        parent=root,
+    )
+    destination_folder = filedialog.askdirectory(
+        title="Select Destination Playlist Folder",
+        mustexist=True,
+        parent=root,
+    )
+
+    if not os.path.exists(destination_folder):
+        os.makedirs(destination_folder)
+
+    existing_paths = []
+    create_song_playlists(source_folder, destination_folder, existing_paths)
+
+    print("All playlists have been created successfully!")
+
+# Call the function to create all the playlists
+create_all_playlists()
