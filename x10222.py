@@ -197,7 +197,7 @@ def skip_tracks(choice):
 executed_commands = []
 
 def execute_command(command):
-    formatted_command = f"open '{command}.m3u'"
+    formatted_command = f"vlc '{command}.m3u'"
     os.system(formatted_command)
     executed_commands.append(formatted_command)
 
