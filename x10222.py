@@ -632,7 +632,7 @@ if __name__ == "__main__":
                             if random_song:
                                 print(f"Random song selected: {random_song}")
                                     # Run the bash command "open '{random_song}.m3u'"
-                                command = f"open '{random_song}.m3u'"
+                                command = f"vlc '{random_song}.m3u'"
                                 subprocess.run(command, shell=True)
                         except ValueError:
                             print("Invalid input. Please enter a valid number.")
