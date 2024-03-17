@@ -1,0 +1,24 @@
+import socket
+import time
+
+def main():
+    client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    client_socket.connect(("192.168.68.118", 12345))  # Replace "your_server_ip" with the actual IP address of your server
+
+    try:
+        while True:
+            with open("song2.txt", "r") as file:
+                content = file.read()
+
+            if content:
+                client_socket.send(content.encode())
+                time.sleep(1)  # Sleep to avoid sending data too frequently
+
+    except KeyboardInterrupt:
+        pass
+    finally:
+        print("\nConnection closed.")
+        client_socket.close()
+
+if __name__ == "__main__":
+    main()
