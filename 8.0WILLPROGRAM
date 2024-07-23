@@ -1,0 +1,274 @@
+import tkinter as tk
+from tkinter import messagebox, simpledialog
+import json
+import os
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
+
+# Use os.path.expanduser to get user-specific directory
+FILE_PATH = os.path.expanduser('~/contacts.json')
+
+def save_contacts_to_json(contacts):
+    try:
+        with open(FILE_PATH, 'w') as f:
+            json.dump(contacts, f, indent=4)
+    except IOError as e:
+        messagebox.showerror("Error", f"Unable to save contacts: {e}")
+
+def load_contacts_from_json():
+    contacts = []
+    try:
+        with open(FILE_PATH, 'r') as f:
+            contacts = json.load(f)
+    except FileNotFoundError:
+        messagebox.showwarning("File Not Found", f"File {FILE_PATH} not found. Creating a new file.")
+        save_contacts_to_json(contacts)  # Create the file if it doesn't exist
+    except IOError as e:
+        messagebox.showerror("Error", f"Unable to load contacts: {e}")
+    return contacts
+
+def generate_pdf(contact):
+    filename = f"{contact['name']}_contact_info.pdf"
+    c = canvas.Canvas(filename, pagesize=letter)
+
+    c.drawString(100, 750, "Contact Information")
+    c.drawString(100, 730, "-" * 50)
+
+    y_position = 700
+    c.drawString(100, y_position, f"Name: {contact['name']}")
+    c.drawString(100, y_position - 20, f"Bio: {contact['bio']}")
+    c.drawString(100, y_position - 40, f"Power of Attorney: {'Yes' if contact.get('power_of_attorney', False) else 'No'}")
+    c.drawString(100, y_position - 60, f"Pets: {contact.get('pets', '')}")
+    c.drawString(100, y_position - 80, f"Letter to Loved Ones:\n{contact.get('letter', '')}")
+    c.drawString(100, y_position - 120, f"Thoughts on Death:\n{contact.get('thoughts_on_death', '')}")
+    c.drawString(100, y_position - 160, f"Final Words:\n{contact.get('final_words', '')}")
+    c.drawString(100, y_position - 200, f"Employment Information:")
+    if contact.get('has_employment', False):
+        y_position -= 220
+        c.drawString(120, y_position, f"Employer Contact: {contact.get('employer_contact', '')}")
+        c.drawString(120, y_position - 20, f"Current Benefits and Documents: {contact.get('benefits_documents', '')}")
+        c.drawString(120, y_position - 40, f"Position: {contact.get('position', '')}")
+        c.drawString(120, y_position - 60, f"Start Date: {contact.get('start_date', '')}")
+        if contact.get('ownership_interest', False):
+            c.drawString(140, y_position - 80, f"Ownership Interest: Yes, {contact.get('ownership_percentage', '')}%")
+        else:
+            c.drawString(140, y_position - 80, f"Ownership Interest: No")
+
+    c.save()
+    messagebox.showinfo("PDF Created", f"PDF file '{filename}' created successfully!")
+
+def print_contacts():
+    contacts = load_contacts_from_json()
+    if contacts:
+        contact_list.delete(0, tk.END)  # Clear existing list
+        for contact in contacts:
+            if isinstance(contact, dict) and 'name' in contact and 'bio' in contact:
+                # Display contact information in the listbox
+                contact_info = f"Name: {contact['name']}, Bio: {contact['bio']}"
+                if 'power_of_attorney' in contact:
+                    contact_info += f", Power of Attorney: {'Yes' if contact['power_of_attorney'] else 'No'}"
+                if 'pets' in contact and contact['pets']:
+                    contact_info += f", Pets: {contact['pets']}"
+                if 'letter' in contact:
+                    contact_info += f"\nLetter to Loved Ones:\n{contact['letter']}"
+                if 'thoughts_on_death' in contact:
+                    contact_info += f"\nThoughts on Death:\n{contact['thoughts_on_death']}"
+                if 'final_words' in contact:
+                    contact_info += f"\nFinal Words:\n{contact['final_words']}"
+                if 'has_employment' in contact and contact['has_employment']:
+                    contact_info += "\nEmployment Information:"
+                    contact_info += f"\nEmployer Contact: {contact.get('employer_contact', '')}"
+                    contact_info += f"\nCurrent Benefits and Documents: {contact.get('benefits_documents', '')}"
+                    contact_info += f"\nPosition: {contact.get('position', '')}"
+                    contact_info += f"\nStart Date: {contact.get('start_date', '')}"
+                    if contact.get('ownership_interest', False):
+                        contact_info += f"\nOwnership Interest: Yes, {contact.get('ownership_percentage', '')}%"
+                    else:
+                        contact_info += f"\nOwnership Interest: No"
+                contact_list.insert(tk.END, contact_info)
+            else:
+                print("Invalid contact format:", contact)
+    else:
+        contact_list.delete(0, tk.END)  # Clear existing list
+        contact_list.insert(tk.END, 'No contacts available.')
+
+def add_contact(name, bio, root, add_contact_window):
+    contacts = load_contacts_from_json()
+    contacts.append({
+        'name': name,
+        'bio': bio,
+    })
+    save_contacts_to_json(contacts)
+    add_contact_window.destroy()
+    root.deiconify()
+    messagebox.showinfo('Success', 'Contact information saved successfully!')
+    print_contacts()
+
+def open_add_contact_window():
+    root.withdraw()
+    add_contact_window = tk.Toplevel()
+    add_contact_window.title("Add Contact")
+
+    tk.Label(add_contact_window, text="Name:").pack(pady=10)
+    name_entry = tk.Entry(add_contact_window)
+    name_entry.pack()
+
+    tk.Label(add_contact_window, text="Bio:").pack(pady=10)
+    bio_entry = tk.Entry(add_contact_window)
+    bio_entry.pack()
+
+    tk.Button(add_contact_window, text="Add Contact", command=lambda: add_contact(
+        name_entry.get(),
+        bio_entry.get(),
+        root,
+        add_contact_window
+    )).pack(pady=20)
+
+    add_contact_window.protocol("WM_DELETE_WINDOW", lambda: root.deiconify())
+
+def open_edit_contact_window():
+    selected_contact_index = contact_list.curselection()
+    if selected_contact_index:
+        selected_contact_index = int(selected_contact_index[0])
+        contact_to_edit = contacts[selected_contact_index]
+
+        edit_contact_window = tk.Toplevel()
+        edit_contact_window.title("Edit Contact")
+
+        tk.Label(edit_contact_window, text="Name:").pack(pady=10)
+        name_entry = tk.Entry(edit_contact_window)
+        name_entry.insert(tk.END, contact_to_edit.get('name', ''))
+        name_entry.pack()
+
+        tk.Label(edit_contact_window, text="Bio:").pack(pady=10)
+        bio_entry = tk.Entry(edit_contact_window)
+        bio_entry.insert(tk.END, contact_to_edit.get('bio', ''))
+        bio_entry.pack()
+
+        tk.Label(edit_contact_window, text="Pets:").pack(pady=10)
+        pets_entry = tk.Entry(edit_contact_window)
+        pets_entry.insert(tk.END, contact_to_edit.get('pets', ''))
+        pets_entry.pack()
+
+        tk.Label(edit_contact_window, text="Letter to Loved Ones:").pack(pady=10)
+        letter_entry = tk.Text(edit_contact_window, height=5, width=50)
+        letter_entry.insert(tk.END, contact_to_edit.get('letter', ''))
+        letter_entry.pack()
+
+        tk.Label(edit_contact_window, text="Thoughts on Death:").pack(pady=10)
+        thoughts_on_death_entry = tk.Text(edit_contact_window, height=5, width=50)
+        thoughts_on_death_entry.insert(tk.END, contact_to_edit.get('thoughts_on_death', ''))
+        thoughts_on_death_entry.pack()
+
+        tk.Label(edit_contact_window, text="Final Words:").pack(pady=10)
+        final_words_entry = tk.Text(edit_contact_window, height=5, width=50)
+        final_words_entry.insert(tk.END, contact_to_edit.get('final_words', ''))
+        final_words_entry.pack()
+
+        # Employment information fields
+        employment_frame = tk.Frame(edit_contact_window)
+        employment_frame.pack(pady=10)
+
+        has_employment_var = tk.BooleanVar()
+        has_employment_var.set(contact_to_edit.get('has_employment', False))
+        employment_checkbutton = tk.Checkbutton(edit_contact_window, text="Has Employment",
+                                                variable=has_employment_var,
+                                                command=lambda: toggle_employment_fields(employment_frame,
+                                                                                        has_employment_var))
+        employment_checkbutton.pack()
+
+        tk.Label(employment_frame, text="Employer Contact:").pack(pady=5)
+        employer_contact_entry = tk.Entry(employment_frame)
+        employer_contact_entry.insert(tk.END, contact_to_edit.get('employer_contact', ''))
+        employer_contact_entry.pack()
+
+        tk.Label(employment_frame, text="Benefits and Documents:").pack(pady=5)
+        benefits_documents_entry = tk.Entry(employment_frame)
+        benefits_documents_entry.insert(tk.END, contact_to_edit.get('benefits_documents', ''))
+        benefits_documents_entry.pack()
+
+        tk.Label(employment_frame, text="Position:").pack(pady=5)
+        position_entry = tk.Entry(employment_frame)
+        position_entry.insert(tk.END, contact_to_edit.get('position', ''))
+        position_entry.pack()
+
+        tk.Label(employment_frame, text="Start Date:").pack(pady=5)
+        start_date_entry = tk.Entry(employment_frame)
+        start_date_entry.insert(tk.END, contact_to_edit.get('start_date', ''))
+        start_date_entry.pack()
+
+        ownership_interest_var = tk.BooleanVar()
+        ownership_interest_var.set(contact_to_edit.get('ownership_interest', False))
+        ownership_checkbutton = tk.Checkbutton(employment_frame, text="Ownership Interest",
+                                                variable=ownership_interest_var)
+        ownership_checkbutton.pack()
+
+        tk.Label(employment_frame, text="Ownership Percentage:").pack(pady=5)
+        ownership_percentage_entry = tk.Entry(employment_frame)
+        ownership_percentage_entry.insert(tk.END, contact_to_edit.get('ownership_percentage', ''))
+        ownership_percentage_entry.pack()
+
+        def toggle_employment_fields(frame, var):
+            if var.get():
+                frame.pack(pady=10)
+            else:
+                frame.pack_forget()
+
+        def update_contact():
+            if messagebox.askyesno("Update Contact", "Are you sure you want to update the contact?"):
+                contact_to_edit['name'] = name_entry.get()
+                contact_to_edit['bio'] = bio_entry.get()
+                contact_to_edit['pets'] = pets_entry.get()
+                contact_to_edit['letter'] = letter_entry.get("1.0", tk.END).strip()
+                contact_to_edit['thoughts_on_death'] = thoughts_on_death_entry.get("1.0", tk.END).strip()
+                contact_to_edit['final_words'] = final_words_entry.get("1.0", tk.END).strip()
+                contact_to_edit['has_employment'] = has_employment_var.get()
+                if has_employment_var.get():
+                    contact_to_edit['employer_contact'] = employer_contact_entry.get()
+                    contact_to_edit['benefits_documents'] = benefits_documents_entry.get()
+                    contact_to_edit['position'] = position_entry.get()
+                    contact_to_edit['start_date'] = start_date_entry.get()
+                    contact_to_edit['ownership_interest'] = ownership_interest_var.get()
+                    if ownership_interest_var.get():
+                        contact_to_edit['ownership_percentage'] = ownership_percentage_entry.get()
+
+                save_contacts_to_json(contacts)
+                edit_contact_window.destroy()
+                root.deiconify()
+                messagebox.showinfo('Success', 'Contact information updated successfully!')
+                print_contacts()
+
+        tk.Button(edit_contact_window, text="Save Changes", command=update_contact).pack(pady=20)
+
+        edit_contact_window.protocol("WM_DELETE_WINDOW", lambda: root.deiconify())
+    else:
+        messagebox.showwarning('No Contact Selected', 'Please select a contact to edit.')
+
+# Initialize tkinter
+root = tk.Tk()
+root.title("Contact Management System")
+
+# Load contacts from JSON file
+contacts = load_contacts_from_json()
+
+# Create and pack the listbox to display contacts
+contact_list = tk.Listbox(root, width=100, height=20)
+contact_list.pack(pady=20)
+
+# Populate the listbox with contacts
+print_contacts()
+
+# Create and pack buttons
+add_contact_button = tk.Button(root, text="Add Contact", command=open_add_contact_window)
+add_contact_button.pack(pady=10)
+
+edit_contact_button = tk.Button(root, text="Edit Contact", command=open_edit_contact_window)
+edit_contact_button.pack(pady=10)
+
+generate_pdf_button = tk.Button(root, text="Generate PDF", command=lambda: generate_pdf(contacts[0]))
+generate_pdf_button.pack(pady=10)
+
+print_contacts_button = tk.Button(root, text="Print Contacts", command=print_contacts)
+print_contacts_button.pack(pady=10)
+
+root.mainloop()
